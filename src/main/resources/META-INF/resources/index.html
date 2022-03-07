@@ -1,0 +1,246 @@
+<!doctype html>
+<html data-framework="vue">
+<head>
+    <meta charset="utf-8">
+    <title>Vue.js • TodoMVC</title>
+    <link rel="stylesheet" href="https://www.unpkg.com/todomvc@0.1.1/examples/batman/bower_components/todomvc-common/base.css">
+    <link rel="stylesheet" href="https://unpkg.com/todomvc-app-css@2.3.0/index.css">
+    <style> [v-cloak] { display: none; } </style>
+</head>
+<body>
+<section class="todoapp" v-cloak>
+    <header class="header">
+        <h1>todos</h1>
+        <input class="new-todo" autofocus autocomplete="off" placeholder="What needs to be done?" v-model="newTodo" @keyup.enter="addTodo">
+    </header>
+    <section class="main" v-show="todos.length">
+        <input id="toggle-all" class="toggle-all" type="checkbox" v-model="allDone">
+        <label for="toggle-all">Mark all as complete</label>
+        <ul class="todo-list">
+            <li class="todo" v-for="todo in filteredTodos" :key="todo.id" :class="{completed: todo.completed, editing: todo == editedTodo}">
+                <div class="view">
+                    <input class="toggle" type="checkbox" v-model="todo.completed" @click="toggleTodo(todo)">
+                    <label @dblclick="editTodo(todo)">{{todo.title}}</label>
+                    <button class="destroy" @click="removeTodo(todo)"></button>
+                </div>
+                <input class="edit" type="text" v-model="todo.title" v-todo-focus="todo == editedTodo" @blur="doneEdit(todo)" @keyup.enter="doneEdit(todo)" @keyup.esc="cancelEdit(todo)">
+            </li>
+        </ul>
+    </section>
+    <footer class="footer" v-show="todos.length">
+				<span class="todo-count">
+					<strong v-text="remaining"></strong> {{pluralize('item', remaining)}} left
+				</span>
+        <ul class="filters">
+            <li><a href="#/all" :class="{selected: visibility == 'all'}">All</a></li>
+            <li><a href="#/active" :class="{selected: visibility == 'active'}">Active</a></li>
+            <li><a href="#/completed" :class="{selected: visibility == 'completed'}">Completed</a></li>
+        </ul>
+        <button class="clear-completed" @click="removeCompleted" v-show="todos.length > remaining">
+            Clear completed
+        </button>
+    </footer>
+</section>
+<script src="https://www.unpkg.com/todomvc@0.1.1/examples/batman/bower_components/todomvc-common/base.js"></script>
+<script src="https://www.unpkg.com/director@1.2.8/build/director.min.js"></script>
+<script src="https://unpkg.com/vue@2.6.14/dist/vue.min.js"></script>
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<script src="https://unpkg.com/vue-axios@2.1.3/dist/vue-axios.min.js"></script>
+
+<script>
+(function (exports) {
+
+'use strict';
+
+var serverUrl = 'api/';
+
+exports.todoStorage = {
+    fetch: async function () {
+        const response = await axios.get(serverUrl);
+        console.log(response.data);
+        return response.data;
+    },
+    add : async function(item) {
+      console.log("Adding todo item " + item.title);
+      return (await axios.post(serverUrl, item)).data;
+    },
+    save: async function (item) {
+        console.log("save called with", item);
+        await axios.patch(serverUrl + item.id, item);
+    },
+    delete: async function(item) {
+        await axios.delete(serverUrl + item.id);
+    },
+    deleteCompleted: async function() {
+        await axios.delete(serverUrl);
+    }
+};
+
+})(window);
+
+</script>
+<script>
+
+(function (exports) {
+
+'use strict';
+
+var filters = {
+    all: function (todos) {
+        return todos;
+    },
+    active: function (todos) {
+        return todos.filter(function (todo) {
+            return !todo.completed;
+        });
+    },
+    completed: function (todos) {
+        return todos.filter(function (todo) {
+            return todo.completed;
+        });
+    }
+};
+
+exports.app = new Vue({
+
+    // the root element that will be compiled
+    el: '.todoapp',
+
+    // app initial state
+    data: {
+        todos: [],
+        newTodo: '',
+        editedTodo: null,
+        visibility: 'all'
+    },
+
+    computed: {
+        filteredTodos: function () {
+            return filters[this.visibility](this.todos);
+        },
+        remaining: function () {
+            return filters.active(this.todos).length;
+        },
+        allDone: {
+            get: function () {
+                return this.remaining === 0;
+            },
+            set: function (value) {
+                this.todos.forEach(function (todo) {
+                    todo.completed = value;
+                });
+            }
+        }
+    },
+
+    methods: {
+
+        pluralize: function (word, count) {
+            return word + (count === 1 ? '' : 's');
+        },
+
+        addTodo: async function () {
+            var value = this.newTodo && this.newTodo.trim();
+            if (!value) {
+                return;
+            }
+
+            const item = await todoStorage.add({
+                title : value,
+                order: this.todos.length + 1,
+                completed: false
+            });
+            this.todos.push(item);
+            this.newTodo = '';
+        },
+
+        removeTodo: async function (todo) {
+            await todoStorage.delete(todo);
+            await this.reload();
+        },
+
+        toggleTodo: function (todo) {
+            todo.completed = ! todo.completed;
+            todoStorage.save(todo);
+        },
+
+        editTodo: async function (todo) {
+            this.beforeEditCache = todo.title;
+            this.editedTodo = todo;
+        },
+
+        doneEdit: function (todo) {
+            if (!this.editedTodo) {
+                return;
+            }
+            this.editedTodo = null;
+            todo.title = todo.title.trim();
+            if (!todo.title) {
+                this.removeTodo(todo);
+            } else {
+                todoStorage.save(todo);
+            }
+        },
+
+        cancelEdit: function (todo) {
+            this.editedTodo = null;
+            todo.title = this.beforeEditCache;
+        },
+
+        removeCompleted: async function () {
+            await todoStorage.deleteCompleted();
+            await this.reload();
+        },
+
+        reload: async function () {
+            const data = await todoStorage.fetch();
+            app.todos = data;
+        }
+    },
+
+    // a custom directive to wait for the DOM to be updated
+    // before focusing on the input field.
+    // http://vuejs.org/guide/custom-directive.html
+    directives: {
+        'todo-focus': function (el, binding) {
+            if (binding.value) {
+                el.focus();
+            }
+        }
+    },
+
+    mounted : async function() {
+        this.reload();
+    }
+});
+
+})(window);
+
+</script>
+
+<script>
+
+(function (app, Router) {
+
+'use strict';
+
+var router = new Router();
+
+['all', 'active', 'completed'].forEach(function (visibility) {
+    router.on(visibility, function () {
+        app.visibility = visibility;
+    });
+});
+
+router.configure({
+    notfound: function () {
+        window.location.hash = '';
+        app.visibility = 'all';
+    }
+});
+
+router.init();
+
+})(app, Router);
+</script>
+</body>
