@@ -7,7 +7,7 @@ projects:
   - git:
       remotes:
         origin: 'https://github.com/kahlai/todo-quarkus.git'
-    name: conda-demo
+    name: todo-quarkus
 components:
   - attributes:
       app.kubernetes.io/name: tools
