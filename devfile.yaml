@@ -38,6 +38,12 @@ components:
       env:
         - name: QUARKUS_HTTP_HOST
           value: 0.0.0.0
+        - name: QUARKUS_HTTP_HOST
+          value: 0.0.0.0
+        - name: PLUGIN_REMOTE_ENDPOINT_EXECUTABLE
+          value: /remote-endpoint/plugin-remote-endpoint
+        - name: THEIA_PLUGINS
+          value: 'local-dir:///plugins/sidecars/tools'
       image: 'registry.redhat.io/devspaces/udi-rhel8@sha256:b6d9371d7178cd9215afb61cd14861701735019b4699448be0bbfdd1f7e8115b'
       memoryLimit: 4G
       mountSources: true
@@ -45,6 +51,10 @@ components:
       volumeMounts:
         - name: m2
           path: /home/user/.m2
+        - name: remote-endpoint
+          path: /remote-endpoint
+        - name: plugins
+          path: /plugins
     name: tools
   - name: m2
     volume:
